@@ -1,0 +1,7 @@
+.buildpath
+.project
+/.settings
+/nbproject
+/vendor
+/vendor_error
+composer.lock

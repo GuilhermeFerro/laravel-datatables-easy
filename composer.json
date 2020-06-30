@@ -1,0 +1,29 @@
+{
+    "name": "gianclaudiooliveira/datatableseasy",
+	"description": "Processer Serve easy in Laravel from plugin Datatable",
+    "authors": [
+        {
+            "name": "Gianclaudio Oliveira",
+            "email": "gianclaudiooliveira@yahoo.com.br"
+        },
+		{
+			"name": "Guilherme Ferro",
+			"email": "gsferroti@gmail.com"
+		}
+    ],
+    "require": {
+        "datatables/datatables": "^1.10.7"
+	},
+	"autoload": {
+		"psr-4": {
+			"DatatablesEasy\\": ""
+		}
+	},
+	"extra": {
+		"laravel": {
+			"providers": [
+				"DatatablesEasy\\DatatablesEasyServiceProvider"
+			]
+		}
+	}
+}

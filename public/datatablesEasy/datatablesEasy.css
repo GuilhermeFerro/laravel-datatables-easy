@@ -1,0 +1,47 @@
+/*
+.dataTables_wrapper .dataTables_processing {
+  position: absolute !important;
+  top: 50% !important;
+  left: 25% !important;
+  width: 50% !important;
+  height: 40px !important;
+  margin-top: -25px !important;
+  padding-top: 9px !important;
+  text-align: center !important;
+  font-size: 1.2em !important;
+  background-color: #266EB8 !important;
+  color: white !important;
+}
+*/
+.dataTables_wrapper .dataTables_processing {
+	position: absolute;
+	top: 100px;
+	left: 50%;
+	width: 100%;
+	height: 40px;
+	margin-left: -50%;
+	margin-top: -45px;
+	padding-top: 10px;
+	text-align: center;
+	font-size: 1.2em;
+	background: none;
+	background-color: rgba(38, 110, 184, 0.6) !important; /* #266EB8 */
+	color: white !important;
+}
+
+table tr.filtros input,
+table tr.filtros select,
+table tr.filtros textarea {
+    width: 100% !important;
+}
+
+.btnFilterFlag:not(:first-child) {
+	margin-left: 4px;
+}
+
+.marked > .fa{
+	color: green;
+}
+.unmarked > .fa{
+	color: rgb(150, 150, 150);
+}
