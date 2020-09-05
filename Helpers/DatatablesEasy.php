@@ -188,7 +188,7 @@ class DatatablesEasy
 	 * Retorna os filters de colunas enviados no request
 	 * @return array
 	 */
-	private function getRequestedColumnsFilters()
+	private function getRequestedColumns()
 	{
 		$request = request();
 		return $request->input('columns');
@@ -299,7 +299,7 @@ class DatatablesEasy
 		preg_match_all ("/([a-z0-1_-]+)$/i", $fieldname, $matches);
 		$matches = $this->invertMatches($matches);
 		$purefieldname = $matches[0][1] ?? "";
-		$directtable = count($joins) > 0 ? end($joins)["table"]."." : "";
+		$directtable = count($joins) > 0 ? end($joins)["table"]."." : $this->modelTableName.".";
 		return $directtable.$purefieldname;
 	}
 
@@ -328,7 +328,7 @@ class DatatablesEasy
 				$lk = $this->tableDefinitions($lt)["relations"][$rt]["fk"];
 			}
 			else {
-				$rk = $this->tableDefinitions($lt)["referenced"][$rt]["fk"];
+				$rk = $this->tableDefinitions($rt)["relations"][$lt]["fk"];
 				$lk = $this->tableDefinitions($lt)["pk"];
 			}
 			$this->allJoins[] = $rt;
@@ -373,57 +373,70 @@ class DatatablesEasy
 	{
 		$defs = [];
 
-		// {***} Flexibilizar para varios bancos (MySQL, Oracle etc)
+		// ###DATABASE###
 
-		///////// SQL Server
+		if (self::isMSSQL()){ // SQL Server
 
-		// pegando colunas e PK
-		$rows = DB::select("
-			SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
-			FROM INFORMATION_SCHEMA.COLUMNS
-			WHERE TABLE_NAME = '".$tableName."';
-		"); // CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
-		foreach ($rows as $row){
-			// pegando PK
-			if (!isset($defs["pk"]))
-				$defs["pk"] = $row->COLUMN_NAME;
-			$defs["fields"][$row->COLUMN_NAME]["type"] = $row->DATA_TYPE;
-		}
+			// pegando colunas e PK
+			$rows = DB::select("
+				SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
+				FROM INFORMATION_SCHEMA.COLUMNS
+				WHERE TABLE_NAME = '".$tableName."';
+			"); // CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
+			foreach ($rows as $row){
+				// pegando PK
+				if (!isset($defs["pk"]))
+					$defs["pk"] = $row->COLUMN_NAME;
+				$defs["fields"][$row->COLUMN_NAME]["type"] = $this->handleFieldType($row->DATA_TYPE);
+			}
 
-		// pegando relations (has e ligacao->tabela)
-		$rows = DB::select("
-			SELECT
-				object_name(f.referenced_object_id) RefTableName,
-				COL_NAME(fc.parent_object_id,fc.parent_column_id) ColName
-			FROM sys.foreign_keys f
-			INNER JOIN
-				sys.foreign_key_columns AS fc
-				  ON (f.OBJECT_ID = fc.constraint_object_id)
-			WHERE f.parent_object_id = object_id('".$tableName."')
-		"); // name, object_name(f.parent_object_id) ParentTableName,
-		foreach ($rows as $row){
-			$defs["relations"][$row->RefTableName]["fk"] = $row->ColName;
-		}
+			// pegando relations - campos desta tabela que fazem referência ao ID de uma outra tabela (tabela estrangeira + fk nesta tabela que é o ID da tabela estrangeira)
+			$rows = DB::select("
+				SELECT
+					object_name(f.referenced_object_id) RefTableName,
+					COL_NAME(fc.parent_object_id,fc.parent_column_id) ColName
+				FROM sys.foreign_keys f
+				INNER JOIN
+					sys.foreign_key_columns AS fc
+					ON (f.OBJECT_ID = fc.constraint_object_id)
+				WHERE f.parent_object_id = object_id('".$tableName."')
+			"); // name, object_name(f.parent_object_id) ParentTableName,
+			foreach ($rows as $row){
+				$defs["relations"][$row->RefTableName]["fk"] = $row->ColName;
+			}
+			
+		} // SQL Server
 
-		// pegando referenced (belongs e tabela->ligacao)
-		$rows = DB::select("
-			SELECT
-			   OBJECT_NAME(f.parent_object_id) TableName,
-			   COL_NAME(fc.parent_object_id,fc.parent_column_id) ColName
-			FROM
-			   sys.foreign_keys AS f
-			INNER JOIN
-			   sys.foreign_key_columns AS fc
-				  ON f.OBJECT_ID = fc.constraint_object_id
-			INNER JOIN
-			   sys.tables t
-				  ON t.OBJECT_ID = fc.referenced_object_id
-			WHERE
-			   OBJECT_NAME (f.referenced_object_id) = '".$tableName."'
-		");
-		foreach ($rows as $row){
-			$defs["referenced"][$row->TableName]["fk"] = $row->ColName;
-		}
+		if (self::isMySQL()){ // MySQL
+
+			// pegando colunas e PK
+			$rows = DB::select("show fields from ".$tableName);
+			foreach($rows as $row){
+				// pegando PK
+				if ($row->Key == "PRI")
+					$defs["pk"] = $row->Field;
+				$defs["fields"][$row->Field]["type"] = $this->handleFieldType($row->Type);
+			}
+			
+			// pegando relations - campos desta tabela que fazem referência ao ID de uma outra tabela (tabela estrangeira + fk nesta tabela que é o ID da tabela estrangeira)
+			$sql = "
+				select
+				COLUMN_NAME as field,
+				REFERENCED_TABLE_NAME as foreign_table,
+				REFERENCED_COLUMN_NAME as foreign_key
+				from
+				INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+				where
+				(TABLE_SCHEMA = SCHEMA()) AND
+				(TABLE_NAME = '".$tableName."') AND
+				(REFERENCED_TABLE_NAME IS NOT NULL)
+			";
+			$rows = DB::select($sql);
+			foreach ($rows as $row){
+				$defs["relations"][$row->foreign_table]["fk"] = $row->field;
+			}
+
+		} // MySQL
 
 		return $defs;
 	}
@@ -652,19 +665,19 @@ class DatatablesEasy
 			$exp = $this->params["calcFields"][$parts[1]];
 		}
 
-		// {***} Flexibilizar para varios bancos (MySQL, Oracle etc)
+		// ###DATABASE###
 
-		// SQL Server
-		if (is_array($exp)){
-			$temp = "case ".$fieldNameFull." ";
-			foreach ($exp as $vo => $vc)
-				if (strtolower($vo) != "else")
-					$temp .= "when ".$this->vTransform($vo)." then ".$this->vTransform($vc)." ";
-				else
-					$temp .= "else ".$this->vTransform($vc)." ";
-			$temp .= "end";
-			$exp = $temp;
-		}
+		if (self::isMSSQL() || self::isMySQL()) // SQL Server e MySQL (MySQL aceita uma outra sintaxe, mas essa serve pra esse caso)
+			if (is_array($exp)){
+				$temp = "case ".$fieldNameFull." ";
+				foreach ($exp as $vo => $vc)
+					if (strtolower($vo) != "else")
+						$temp .= "when ".$this->vTransform($vo)." then ".$this->vTransform($vc)." ";
+					else
+						$temp .= "else ".$this->vTransform($vc)." ";
+				$temp .= "end";
+				$exp = $temp;
+			}
 
 		return $exp;
 	}
@@ -725,31 +738,34 @@ class DatatablesEasy
 
 		// executando filtragem segundo tipo
 		switch($fieldtype){
+			// {***} tratar datetime separadamente de date, de forma a considerar a hora também.
 			case "datetime":
 			case "date":
 				switch ($grafia){
 					case 1: // igualdade
-						// {***} Flexibilizar para varios bancos (MySQL, Oracle etc)
-						// {***} Permitir outros formatos de data
-						$query->$rawClause("convert(varchar(10), ".$fieldNameFull.", 103) = '".$search."'"); // SQL Server
+						// ###DATABASE###
+						if (self::isMSSQL() || self::isMySQL())
+							$query->$rawClause(self::dateFormatFn($fieldNameFull)." = '".$search."'"); // SQL Server e MySQL
 					break;
 					case 2: // in
-						// {***} Flexibilizar para varios bancos (MySQL, Oracle etc)
-						// {***} Permitir outros formatos de data
-						$query->$rawClause("convert(varchar(10), ".$fieldNameFull.", 103) in (".$search.")"); // SQL Server
+						// ###DATABASE###
+						if (self::isMSSQL() || self::isMySQL())
+							$query->$rawClause(self::dateFormatFn($fieldNameFull)." in (".$search.")"); // SQL Server e MySQL
 					break;
 					case 3: // between
+						// {***} Permitir outros formatos de data
 						$inItems = explode (",", $search);
 						$dt_ini = Carbon::createFromFormat('d/m/Y', $inItems[0]);
 						$dt_fim = Carbon::createFromFormat('d/m/Y', $inItems[1]);
 						$query->whereBetween($fieldNameFull, [$dt_ini, $dt_fim]);
 					break;
 					default:
-						// {***} Flexibilizar para varios bancos (MySQL, Oracle etc)
-						// {***} Permitir outros formatos de data
-						$query->$rawClause("convert(varchar(10), ".$fieldNameFull.", 103) like '%".$search."%'"); // SQL Server
+						// ###DATABASE###
+						if (self::isMSSQL() || self::isMySQL())
+							$query->$rawClause(self::dateFormatFn($fieldNameFull)." like '%".$search."%'"); // SQL Server e MySQL
 				}
 			break;
+			case "time":
 			case "varchar":
 				switch ($grafia){
 					case 1: // igualdade
@@ -898,8 +914,11 @@ class DatatablesEasy
 
 		// É campo calculado?
 		if ($this->isCalcField($fieldNameFull) && !$original){
-			 // {***} TODO Adicionar suporte à bancos variados
-			$query->addSelect(DB::raw($selectname." = ".$this->getCalcExpression($fieldNameFull))); // SQL Server
+			// ###DATABASE###
+			if (self::isMSSQL())
+				$query->addSelect(DB::raw($selectname." = ".$this->getCalcExpression($fieldNameFull))); // SQL Server
+			if (self::isMySQL())
+				$query->addSelect(DB::raw($this->getCalcExpression($fieldNameFull)." as ".$selectname)); // MySQL
 			return;
 		}
 
@@ -908,8 +927,9 @@ class DatatablesEasy
 		$fieldtype = $this->tableDefinitions($tablename)["fields"][$fieldname]["type"];
 		#
 		if ($fieldtype == "datetime" || $fieldtype == "date"){
-			 // {***} TODO Adicionar suporte à bancos variados
-			$query->addSelect(DB::raw($selectname." = convert(varchar(10), ".$fieldNameFull.", 103)")); // SQL Server
+			// ###DATABASE###
+			if (self::isMSSQL()) $query->addSelect(DB::raw($selectname." = ".self::dateFormatFn($fieldNameFull))); // SQL Server
+			if (self::isMySQL()) $query->addSelect(DB::raw(self::dateFormatFn($fieldNameFull)." as ".$selectname)); // MySQL
 			return;
 		}
 
@@ -921,9 +941,9 @@ class DatatablesEasy
 	 * Retorna lista de colunas da tabela HTML, com definições de filtro, se houver.
 	 * @return array
 	 */
-	private function getColumnsFilters()
+	private function getColumns()
 	{
-		$columnsRequested = $this->getRequestedColumnsFilters();
+		$columnsRequested = $this->getRequestedColumns();
 		$columnsParams = $this->params["columns"] ?? [];
 		if (!is_array($columnsParams)) return $columnsRequested;
 
@@ -932,9 +952,55 @@ class DatatablesEasy
 				foreach($item as $propname => $value)
 					$columnsRequested[$idx][$propname] = $value;
 			else
-				$columnsRequested[$idx]["data"] = $item;
+				$columnsRequested[$idx]["name"] = $item;
 
 		return $columnsRequested;
+	}
+
+	private static function getDatabaseType()
+	{
+		return config('database.default');
+	}
+
+	private static function isMySQL()
+	{
+		return self::getDatabaseType() == "mysql" ? TRUE:FALSE;
+	}
+
+	private static function isMSSQL()
+	{
+		return self::getDatabaseType() == "sqlsrv" ? TRUE:FALSE;
+	}
+
+	private static function isSQLite()
+	{
+		return self::getDatabaseType() == "sqlite" ? TRUE:FALSE;
+	}
+
+	private static function isPGSQL()
+	{
+		return self::getDatabaseType() == "pgsql" ? TRUE:FALSE;
+	}
+
+	private static function dateFormatFn($fieldname)
+	{
+		// {***} TODO flexibilizar formato da data. Hoje, está fixo em DD/MM/YYYY.
+		if (self::isMSSQL()) return "convert(varchar(10), ".$fieldname.", 103)"; // SQL Server
+		if (self::isMySQL()) return "DATE_FORMAT(".$fieldname.", '%d/%m/%Y')"; // MySQL
+	}
+
+	private function handleFieldType($fieldTypeRaw)
+	{
+		if (strpos($fieldTypeRaw, "char") !== FALSE) return "varchar";
+		if (strpos($fieldTypeRaw, "text") !== FALSE) return "varchar";
+		if (strpos($fieldTypeRaw, "blob") !== FALSE) return "varchar";
+		if (strpos($fieldTypeRaw, "int") !== FALSE) return "int";
+		if (strpos($fieldTypeRaw, "datetime") !== FALSE) return "datetime";
+		if (strpos($fieldTypeRaw, "date") !== FALSE) return "date";
+		if (strpos($fieldTypeRaw, "time") !== FALSE) return "time";
+		if (strpos($fieldTypeRaw, "num") !== FALSE) return "decimal";
+		if (strpos($fieldTypeRaw, "dec") !== FALSE) return "decimal";
+		return $fieldTypeRaw;
 	}
 
 	public function __construct ($params = [])
@@ -944,6 +1010,7 @@ class DatatablesEasy
 		$this->params = array_merge ($this->getRequestedParams(), $params);
 		$this->modelClass = "\\App\\".$this->params["modelname"];
 		$this->modelTableName = (new $this->modelClass)->getTable();
+		$this->allJoins[] = $this->modelTableName;
 		$this->modelTablePk = $this->tableDefinitions($this->modelTableName)["pk"];
 	}
 
@@ -967,7 +1034,7 @@ class DatatablesEasy
         // parametros vindos do datatable
 		$order = $this->getRequestedOrder();
 		$search = $this->getRequestedGeneralFilter();
-		$columns = $this->getColumnsFilters();
+		$columns = $this->getColumns();
 		$extra = $this->getRequestedExtraFilters();
 		$params = $this->params;
 
@@ -987,28 +1054,39 @@ class DatatablesEasy
 		// aplicando joins fixos
 		foreach ($fixedJoins as $lineJoin)
 			$this->applyJoins($mainQuery, $lineJoin);
+		
+		// aplicando joins das colunas da tabela
+		foreach ($columns as $item){
+			$tmpcolname = isset($item["name"]) ? $item["name"] : $item["data"];
+			$this->applyJoins($mainQuery, $tmpcolname);
+		}
 
 		// aplicando filtros fixos
 		$this->processFilterArray($mainQuery, $fixedFilters);
 
         // contagem geral (populacao)
 		$newQuery = clone $mainQuery;
-		// {***} Flexibilizar para varios bancos (MySQL, Oracle etc), se é que há bancos que fazem isso de forma diferente.
-        $totalizador_geral = $newQuery->selectRaw("count($modelTableName.$modelTablePk) as total")->first();
+		// ###DATABASE###
+		if (self::isMSSQL() || self::isMySQL())
+        	$totalizador_geral = $newQuery->selectRaw("count($modelTableName.$modelTablePk) as total")->first();
         $this->registros_count = $totalizador_geral->total;
 
         // filtrando busca geral
 		if ($search) {
 			$mainQuery->where(function($query) use ($search, $columns){
-				foreach ($columns as $item)
-					$this->applyColumnFilter($query, $search, $item["data"], 1);
+				foreach ($columns as $item){
+					$tmpcolname = isset($item["name"]) ? $item["name"] : $item["data"];
+					$this->applyColumnFilter($query, $search, $tmpcolname, 1);
+				}
 			});
 		}
 
         // filtrando busca por coluna
-		foreach ($columns as $item)
+		foreach ($columns as $item){
+			$tmpcolname = isset($item["name"]) ? $item["name"] : $item["data"];
 			if ($item["search"]["value"] != NULL)
-				$this->applyColumnFilter($mainQuery, $item["search"]["value"], $item["data"], 2);
+				$this->applyColumnFilter($mainQuery, $item["search"]["value"], $tmpcolname, 2);
+		}
 
 		// filtros extras
 		if ($extra) {
@@ -1019,17 +1097,22 @@ class DatatablesEasy
 
 		// contando total filtrados
 		$newQuery = clone $mainQuery;
-		// {***} Flexibilizar para varios bancos (MySQL, Oracle etc), se é que há bancos que fazem isso de forma diferente.
-        $totalizador_filtrado = $newQuery->selectRaw("count($modelTableName.$modelTablePk) as total")->first();
+		// ###DATABASE###
+		if (self::isMSSQL() || self::isMySQL())
+			$totalizador_filtrado = $newQuery->selectRaw("count($modelTableName.$modelTablePk) as total")->first();
         $this->registros_filtered_count = $totalizador_filtrado->total;
 
 		// ordenando
-		foreach ($order as $item)
-			$this->applyColumnOrder($mainQuery, $columns[$item["column"]]["data"], $item["dir"]);
+		foreach ($order as $item){
+			$colidx = isset($columns[$item["column"]]["name"]) ? $columns[$item["column"]]["name"] : $columns[$item["column"]]["data"];
+			$this->applyColumnOrder($mainQuery, $colidx, $item["dir"]);
+		}
 
 		// colunas / campos
-		foreach ($columns as $idx => $item)
-			$this->applyColumnSelect($mainQuery, $item["data"], $idx);
+		foreach ($columns as $idx => $item){
+			$colidx = isset($item["name"]) ? $item["name"] : $item["data"];
+			$this->applyColumnSelect($mainQuery, $colidx, $idx);
+		}
 
 		// salvando definições do BD na session
 		$this->saveDatabaseDefinitions();
@@ -1049,7 +1132,7 @@ class DatatablesEasy
 	}
 
 	/**
-	 * Método principal. Comando toda a brincadeira.
+	 * Método principal. Comanda toda a brincadeira.
 	 * @return Collect
 	 */
 	public function getPage()
@@ -1058,8 +1141,8 @@ class DatatablesEasy
 		$draw = $this->getRequestedDraw();
 		$start = $this->getRequestedStart();
 		$length = $this->getRequestedLength();
-		$columns = $this->getColumnsFilters();
-		$columnsRequested = $this->getRequestedColumnsFilters();
+		$columns = $this->getColumns();
+		$columnsRequested = $this->getRequestedColumns();
 
 		// pegando página específica
 		$pageQuery = $this->getQuery()->offset($start)->limit($length);
@@ -1072,13 +1155,15 @@ class DatatablesEasy
 
 			foreach ($columnsRequested as $idx => $col){
 				$colname = $this->genColName($idx);
-				$fieldNameRaw = $columns[$idx]["data"];
+				$fieldNameRaw = isset($columns[$idx]["name"]) ? $columns[$idx]["name"] : $columns[$idx]["data"];
 				$fieldNameFull = $this->extractFieldName($fieldNameRaw);
+				//$colidx = isset($col["name"]) ? $col["name"] : $col["data"];
+				$colidx = $col["data"];
 
 				if ($this->isTemplateField($fieldNameFull))
-					$temp[$col["data"]] = $this->processFieldTemplate($row, $fieldNameFull);
+					$temp[$colidx] = $this->processFieldTemplate($row, $fieldNameFull);
 				else
-					$temp[$col["data"]] = $row->$colname;
+					$temp[$colidx] = $row->$colname;
 			}
 
             $dados[] = $temp;

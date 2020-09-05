@@ -115,7 +115,10 @@ $.fn.datatablesEasy = function () {
 		delete options.columnFilter;
 	}
 	else {
-		var columnFilter = false;
+		if (this.find("tfoot.filter, tfoot.columnFilter, tfoot > tr.filter, tfoot > tr.columnFilter").length > 0)
+			var columnFilter = true;
+		else
+			var columnFilter = false;
 	}
 
 	// qualquer option pode ser passado por parametro data.
@@ -137,10 +140,10 @@ $.fn.datatablesEasy = function () {
 	}
 	else {
 		// se columns veio, mas é um array de nomes de colunas, converter para o formato do Datatables
-		if (!(colunas[0] && colunas[0].data)){
+		if (!(colunas[0] && colunas[0].data) && !(colunas[0] && colunas[0].name)){
 			var tmp = [];
 			for (var i in colunas)
-				tmp.push({"data": colunas[i]});
+				tmp.push({"name": colunas[i]});
 			colunas = tmp;
 		}
 	}
@@ -165,11 +168,11 @@ $.fn.datatablesEasy = function () {
 		var template = $(mycol).attr("data-template");
 
 		if (columnsDefined){
-			var columnName = colunas[i].data;
+			var columnName = colunas[i].name || colunas[i].data;
 		}
 		else {
-			colunas.push({"data": columnName});
 			var columnName = $(mycol).attr("data-column-name") || ("col"+i);
+			colunas.push({"name": columnName});
 		}
 
 		if ((orderable !== undefined) && (colunas[i].orderable === undefined))
@@ -240,7 +243,8 @@ $.fn.datatablesEasy = function () {
 				// se elemento ainda não tiver sido encontrado...
 				if (element.length === 0) {
 					// pegando elemento-filtro fora da tabela
-					var filterTag = "[data-tblfilter='"+colunas[i].data+"']";
+					var tmpColName = colunas[i].name || colunas[i].data;
+					var filterTag = "[data-tblfilter='"+tmpColName+"']";
 					element = $("input"+filterTag+", select"+filterTag+", textarea"+filterTag);
 
 					// se houver varios elementos com mesmo 'data-tblfilter', pega o que tem a tabela atual assinalada.
@@ -310,7 +314,9 @@ $.fn.datatablesEasy = function () {
             r.find('td, th').each(function(){
                 $(this).css('vertical-align', 'middle');
             });
-            $(_this).find('thead').append(r);
+			$(_this).find('thead').append(r);
+			if (!$(r).hasClass("filter") && !$(r).hasClass("columnFilter"))
+				$(r).addClass("filter");
         },
 		"pagingType" : "full_numbers" ,
 		"language"   : {
@@ -327,9 +333,10 @@ $.fn.datatablesEasy = function () {
 		$('.dataTables_filter label, .dataTables_filter input[type="search"]').remove();
 
     // pesquisa pelas colunas
-    table.columns().every( function () {
-        var that = this;
-        $(this.footer()).find('input, select, textarea').on('keyup change',function(){
+    table.columns().eq(0).each( function (idx) {
+        var that = table.column(idx);
+		$(_this).find("tfoot.filter, tfoot.columnFilter, tr.filter, tr.columnFilter"+(columnFilter ? ", tfoot > tr":""))
+			.find("td").eq(idx).find('input, select, textarea').on('keyup change',function(){
             if (that.search() !== this.value){
                 that.search(this.value).draw();
             }
@@ -347,7 +354,8 @@ $.fn.datatablesEasy = function () {
 			var field = $(this).attr("data-tblfilter");
 			var idxField = -1;
 			for (var i in colunas) { // busncado indice da coluna correspondente
-				if (colunas[i].data === field) {
+				var tmpColName = colunas[i].name || colunas[i].data;
+				if (tmpColName === field) {
 					idxField = i;
 					break;
 				}
