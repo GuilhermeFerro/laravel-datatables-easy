@@ -3,6 +3,7 @@ If you're finding an easy way to uso Datatables, specially with server-side proc
 It will handle all front-end and back-end routines, automatically.
 
 ## Installation
+<br/>
 
 **Step 1** - Install the package:
 ~~~
