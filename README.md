@@ -112,4 +112,4 @@ php artisan vendor:publish
 
 </script>
 ~~~
-## -- UNDER CONSTRUCTION --
+## -- DOCUMENTATION UNDER CONSTRUCTION --
