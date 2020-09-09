@@ -2,6 +2,8 @@
 If you're finding an easy way to uso Datatables, specially with server-side processing, DatatablesEasy is the answer.  
 It will handle all front-end and back-end routines, automatically.
 
+## Instalation
+
 **Step 1** - Install the package:
 ~~~
 composer require gianclaudiooliveira/datatableseasy
@@ -36,7 +38,7 @@ php artisan vendor:publish
 <big><big>**And NOW, you`re ready!**</big></big>
 <br/>
 <br/>
-<hr>
+## Implementation
 <br/>
 <br/>
 
