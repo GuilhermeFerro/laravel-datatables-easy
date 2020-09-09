@@ -36,8 +36,11 @@ php artisan vendor:publish
 **P.S.:** You should have the Datatables plugin already installed and working.
 
 <big><big>**And NOW, you`re ready!**</big></big>
+<br/>
+<br/>
 
 ## Implementation
+<br/>
 
 **Exemple 1:** You have a table People and model Person:
 ~~~
