@@ -217,8 +217,7 @@ You have the same table People and model Person, but you want to include some fo
 
 ### Advanced fixed filters
 
-"_group"
-	-> "AND" group, with 1 or more AND-separated objects;
+**"_group"** -> "AND" group, with 1 or more AND-separated objects:
 	
 	Syntax:
 	{"key": "_group", "item": [
@@ -236,8 +235,7 @@ You have the same table People and model Person, but you want to include some fo
 	});
 
 
-"_orgroup"
-	-> "OR" group, but still AND-separated;
+**"_orgroup"** -> "OR" group, but still AND-separated:
 	
 	Syntax:
 	{"key": "_orgroup", "item": [
@@ -258,8 +256,7 @@ You have the same table People and model Person, but you want to include some fo
 	Obs.: To do a simple OR (with no group), you should use this group, but with a single member.
 
 
-"_operator"
-	-> Like shown in a exemple above, a way to specify an operator:
+**"_operator"**	-> Like shown in a exemple above, a way to specify an operator:
 	
 	Syntax:
 	{"key": "_operator", "item": ["birthdate", ">", "2000-01-15"]}
@@ -271,8 +268,7 @@ You have the same table People and model Person, but you want to include some fo
 	Person::where("birthdate", ">", "2000-01-15");
 	
 
-"_null", "_notnull"
-	-> NULL / NOT NULL clause.
+**"_null", "_notnull"**	-> NULL / NOT NULL clause:
 	
 	Syntax:
 	{"key": "_notnull", "item": "address"}
@@ -284,8 +280,7 @@ You have the same table People and model Person, but you want to include some fo
 	Person::whereNotNull("address");
 
 
-"_diff"
-	-> To simplify "<>" operator.
+**"_diff"** -> To simplify "<>" operator:
 	
 	Syntax:
 	{"key": "_diff", "item": ["brothers", "0"]}
@@ -297,8 +292,7 @@ You have the same table People and model Person, but you want to include some fo
 	Person::where("brothers", "<>", 0);
 	
 
-"_between", "_notbetween"
-	-> value/item is a 3-item array. First, the target field. 2nd and 3rd, the values to be applied to BETWEEN.
+**"_between", "_notbetween"** -> value/item is a 3-item array. First, the target field. 2nd and 3rd, the values to be applied to BETWEEN:
 	
 	Syntax:
 	{"key": "_between", "item": ["birthdate", "1980-01-01", "1999-12-31"]}
@@ -310,8 +304,7 @@ You have the same table People and model Person, but you want to include some fo
 	Person::whereBetween("birthdate", ["1980-01-01", "1999-12-31"]);
 	
 
-"_in", "_notin"
-	-> value/item is an array with at least 1 item. First, the target field. 2nd, 3rd, 4th.... the values to be applied to IN.
+**"_in", "_notin"** -> value/item is an array with at least 1 item. First, the target field. 2nd, 3rd, 4th.... the values to be applied to IN:
 	
 	Syntax:
 	{"key": "_in", "item": ["code", "A01", "B00", "C99"...]}
