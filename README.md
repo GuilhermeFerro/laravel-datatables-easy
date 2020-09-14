@@ -358,7 +358,8 @@ Always, the point used **after** table's name is related about it:
 - ";" means **inner join**.  
 - "," means **right join**.  
 <br/>
+
 ### Fixed Joins
-Sometimes, you need to define some fixed join, like **inner joins**, even you don't want a field from these tables or ....
+Sometimes, you need to define some fixed join, like **inner joins**, even you don't want a field from these tables or ...
 
 ## -- DOCUMENTATION UNDER CONSTRUCTION --
