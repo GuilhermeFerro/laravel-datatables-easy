@@ -316,4 +316,41 @@ You have the same table People and model Person, but you want to include some fo
 	Person::whereIn("code", ["A01", "B00", "C99"...]);
 	
 
+<br/>
+<br/>
+
+### Joins
+
+DatatablesEasy has a simples way to define joins. All places you can specify a field, you can define a join by showing the relation between the main table and the table who has the field you need, including all tables between those 2. See below:  
+<br/>
+Exemple: You have a table People. You need the field..
+
+### Fixed Joins
+Sometimes, you need to define some fixed join, like **inner joins**, even you don't want a field from these tables or 
+~~~
+<script type="text/javascript">
+
+	$("#tblMain").datatablesEasy({
+
+		modelname: "Person",
+		fixedFilters: [
+			{"key": "_operator", "item": ["birthdate", ">", "2000-01-15"]},
+			{"key": "children", "item": "0"},
+			{"key": "_notnull", "item": "address"}
+		],
+		columns: [
+			{name: "firstname"},
+			{name: "lastname"},
+			{name: "birthdate", "className": "text-center"},
+			{name: "genders.title", "className": "text-center"},
+			{name: "address"},
+			{name: "states.name"},
+			{name: "cities.name"}
+		]
+
+	});
+
+</script>
+~~~
+
 ## -- DOCUMENTATION UNDER CONSTRUCTION --
