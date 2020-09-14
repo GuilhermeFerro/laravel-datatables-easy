@@ -354,11 +354,9 @@ Like this:
 I fact, when you're speaking about tables, the pontuation you use to connect the tables will say which king of relation there is between them.  
 Always, the point used **after** table's name is related about it:
 <br/>
-~~~
-	"." means **left join**.
-	";" means **inner join**.
-	"," means **right join**.
-~~~
+- "." means **left join**.  
+- ";" means **inner join**.  
+- "," means **right join**.  
 <br/>
 ### Fixed Joins
 Sometimes, you need to define some fixed join, like **inner joins**, even you don't want a field from these tables or ....
